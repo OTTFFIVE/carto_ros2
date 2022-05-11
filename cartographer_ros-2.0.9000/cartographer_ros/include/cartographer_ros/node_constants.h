@@ -36,6 +36,7 @@ constexpr char kScanMatchedPointCloudTopic[] = "scan_matched_points2";
 constexpr char kSubmapListTopic[] = "submap_list";
 constexpr char kTrackedPoseTopic[] = "tracked_pose";
 constexpr char kSubmapQueryServiceName[] = "submap_query";
+constexpr char kSetSlamServiceName[] = "set_slam";
 constexpr char kTrajectoryQueryServiceName[] = "trajectory_query";
 constexpr char kStartTrajectoryServiceName[] = "start_trajectory";
 constexpr char kWriteStateServiceName[] = "write_state";

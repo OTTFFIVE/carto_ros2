@@ -41,7 +41,6 @@
 #include "cartographer_ros_msgs/msg/submap_entry.hpp"
 #include "cartographer_ros_msgs/msg/submap_list.hpp"
 #include "cartographer_ros_msgs/srv/submap_query.hpp"
-#include "cartographer_ros_msgs/srv/set_slam.hpp"
 #include "cartographer_ros_msgs/srv/write_state.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include <rclcpp/rclcpp.hpp>
@@ -152,10 +151,6 @@ class Node {
       cartographer_ros_msgs::srv::GetTrajectoryStates::Response::SharedPtr response);
   bool handleReadMetrics(const cartographer_ros_msgs::srv::ReadMetrics::Request::SharedPtr,
       cartographer_ros_msgs::srv::ReadMetrics::Response::SharedPtr response);
-  bool handleSetSlam(
-      const cartographer_ros_msgs::srv::SetSlam::Request::SharedPtr request,
-      cartographer_ros_msgs::srv::SetSlam::Response::SharedPtr response);
-
 
   // Returns the set of SensorIds expected for a trajectory.
   // 'SensorId::id' is the expected ROS topic name.
@@ -205,7 +200,6 @@ class Node {
   ::rclcpp::Service<cartographer_ros_msgs::srv::WriteState>::SharedPtr write_state_server_;
   ::rclcpp::Service<cartographer_ros_msgs::srv::GetTrajectoryStates>::SharedPtr get_trajectory_states_server_;
   ::rclcpp::Service<cartographer_ros_msgs::srv::ReadMetrics>::SharedPtr read_metrics_server_;
-  ::rclcpp::Service<cartographer_ros_msgs::srv::SetSlam>::SharedPtr set_slam_server_;
 
 
   struct TrajectorySensorSamplers {
