@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <boost/filesystem.hpp>
 
 #include "absl/synchronization/mutex.h"
 #include "cartographer/common/fixed_ratio_sampler.h"
@@ -118,9 +119,31 @@ class Node {
   void SerializeState(const std::string& filename,
                       const bool include_unfinished_submaps);
 
+  bool SavePbtreamMap(std::string dir, std::string filename);
+
   // Loads a serialized SLAM state from a .pbstream file.
   void LoadState(const std::string& state_filename, bool load_frozen_state);
 
+  void SetConfigurationDirectory(const std::string& configuration_directory) {
+    configuration_directory_.assign(configuration_directory);
+  }
+  void SetConfigurationBasename(const std::string& configuration_basename) {
+    // configuration_basename_ = configuration_basename;
+    configuration_basename_.assign(configuration_basename);
+  }
+  void SetConfigurationBasenameLoc(const std::string& configuration_basename_loc) {
+    // configuration_basename_ = configuration_basename;
+    configuration_basename_loc_.assign(configuration_basename_loc);
+  }
+  const std::string GetConfigurationDirectory() {
+    return configuration_directory_;
+  }
+  const std::string GetConfigurationBasename() {
+    return configuration_basename_;
+  }
+  const std::string GetConfigurationBasenameLoc() {
+    return configuration_basename_loc_;
+  }
  private:
   struct Subscriber {
     rclcpp::SubscriptionBase::SharedPtr subscriber;
@@ -131,6 +154,10 @@ class Node {
     // unique identifier of a subscriber, we remember it ourselves.
     std::string topic;
   };
+
+  std::string configuration_directory_;
+  std::string configuration_basename_;
+  std::string configuration_basename_loc_;
 
   bool handleSubmapQuery(
       const cartographer_ros_msgs::srv::SubmapQuery::Request::SharedPtr request,

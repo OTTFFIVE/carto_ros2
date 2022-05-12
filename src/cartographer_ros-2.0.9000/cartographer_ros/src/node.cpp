@@ -209,322 +209,192 @@ bool Node::handleSetSlam(
 
   if (request->cmd == "build") {
       absl::MutexLock lock(&mutex_);
-      // std::tie(buildmap_node_options_, buildmap_traj_options_) =
-      //         LoadOptions(config_dir_, buildmap_config_filename_);
-      // if (node_) {
-      //   node_->FinishAllTrajectories();
-      //   node_->RunFinalOptimization();
-      //   node_->~Node();
-      //   malloc_trim(0);
-      // }
 
-      // update_angle_ = false;
-      // auto map_builder = absl::make_unique<cartographer::mapping::MapBuilder>(
-      //     buildmap_node_options_.map_builder_options, cartographer::mapping::MapBuilderState::BUILD_MAP);
-      // node_ =
-      //     new Node(buildmap_node_options_, std::move(map_builder), 
-      //         tf_, false, is_empty_topic);
-      // node_->StartTrajectoryWithDefaultTopics(buildmap_traj_options_);
-      // num_traj_ = 1;
-      // node_->SetDrawMaxTrajectoryID(false);
-      // node_->SetUpdateMap(true);
+      // node_->LoadState(FLAGS_load_state_filename, true);
+      NodeOptions node_options;
+      TrajectoryOptions trajectory_options;
+      std::tie(node_options, trajectory_options) =
+          LoadOptions(GetConfigurationDirectory(), GetConfigurationBasename());
+
+      if (node_) {
+        FinishAllTrajectories();
+        RunFinalOptimization();
+      }
+      StartTrajectoryWithDefaultTopics(trajectory_options);
+
       // slam_status_ = BUILDING;
       // slam_modes_ = BUILD;
       LOG(INFO) << "Start building map.";
 
     response->success = true;
     return true;
-  } 
-
-
-  return true;
-  
-}
-/*
-bool CartoSlam::setSlamCallback(robot_msg::SetSlam::Request &req,
-                                robot_msg::SetSlam::Response &res) {
-  LOG(INFO) << "Received set slam cmd: " << req.cmd;
-  ros::Time start_point = ros::Time::now();
-  ros::Time start_switch = ros::Time::now();
-  save_status_ = false;
-  cartographer_ros_msgs::AngleAndStatus foo;
-  //std::thread th(&CartoSlam::PublishProcess,this);
-  if (req.cmd == "build") {
-    {
-    absl::MutexLock lock(&mutex_);
-    std::tie(buildmap_node_options_, buildmap_traj_options_) =
-    LoadOptions(config_dir_, buildmap_config_filename_);
-    if (node_) {
-      node_->FinishAllTrajectories();
-      node_->RunFinalOptimization();
-      node_->~Node();
-      malloc_trim(0);
-    }
-    if (!erase_region_.empty())
-      erase_region_.clear();
-    angle_ = 0;
-    foo.request.angle = angle_;
-    foo.request.status = "building";
-    foo.request.flag = false;
-    foo.request.width = 0;
-    foo.request.height = 0;
-    foo.request.point.x = 0.;
-    foo.request.point.y = 0.;
-    if ( angle_update_client_.call(foo))
-      LOG(INFO) << "erase region clear.";
-    else LOG(INFO) << "erase region clear faild.";
-    update_angle_ = false;
-    auto map_builder = absl::make_unique<cartographer::mapping::MapBuilder>(
-        buildmap_node_options_.map_builder_options, cartographer::mapping::MapBuilderState::BUILD_MAP);
-    node_ =
-        new Node(buildmap_node_options_, std::move(map_builder), 
-            tf_, false, is_empty_topic);
-    node_->StartTrajectoryWithDefaultTopics(buildmap_traj_options_);
-    num_traj_ = 1;
-    node_->SetDrawMaxTrajectoryID(false);
-    node_->SetUpdateMap(true);
-    node_->BuildmapModeInLocal(false, true);
-    slam_status_ = BUILDING;
-    slam_modes_ = BUILD;
-    LOG(INFO) << "Start building map.";
-
-    robot_msg::SetSlam build_bow_data;
-    build_bow_data.request.cmd = "build";
-    if ( bow_loop_client_.call(build_bow_data))
-      LOG(INFO) << "build bow data.";
-    else LOG(INFO) << "build bow data faild.";
-    }
-    res.success = true;
-    return true;
-
-  } else if (req.cmd == "save") {
-    save_publised_ = 0;
-    boost::filesystem::path p(req.mapdir);
+  } else if (request->cmd == "save") {
+    // save_publised_ = 0;
+    boost::filesystem::path p(request->mapdir);
     if (!boost::filesystem::exists(p)) {
       LOG(INFO) << 
           "The save map directory is not existed, trying to create new "
           "directory.....";
       if (!boost::filesystem::create_directories(p)) {
         LOG(ERROR) << "Create new directory failed, please check privilege!";
-        res.success = false;
-        res.message = "Create new directory failed, please check privilege!";
+        response->success = false;
+        response->message = "Create new directory failed, please check privilege!";
         return true;
       } else {
         LOG(INFO) << "New directory created.";
       }
     }
-    LOG(INFO) << "Detected angle: " << angle_ ;
-    if (GetRegionResult())
-      LOG(INFO) << "rotated map in screen direction.";
-    else
-      LOG(WARNING) << "failed rotated map with screen direction!";
-    start_point = ros::Time::now();
-    slam_status_ = SAVING;
-    save_status_ = false;
+
+    // start_point = ros::Time::now();
+    // slam_status_ = SAVING;
+    // save_status_ = false;
     if (node_ == nullptr) {
-      res.success = false;
-      res.message = "Map doesn't exists.!";
+      response->success = false;
+      response->message = "Map doesn't exists.!";
       LOG(WARNING) << "Saving failed, map doesn't exists!";
-      slam_status_ = WAITTING;
-      return true;
+      // slam_status_ = WAITTING;
+      return false;
     }
-    node_->SetUpdateMap(false);
-    node_->FinishAllTrajectories();
-    node_->RunFinalOptimization();
-    num_traj_ = 0;
-    if ( !save_pbstream_map(req.mapdir, req.filename, 0.05) ) {
-      res.success = false;
-      res.message = "Pbtream Map saving failed! waitting...";
+    FinishAllTrajectories();
+    RunFinalOptimization();
+    if ( !SavePbtreamMap(request->mapdir, request->filename) ) {
+      response->success = false;
+      response->message = "Pbtream Map saving failed! waitting...";
       LOG(WARNING) << "Saving failed, pbstream map hasn't initialized!";
-      slam_status_ = WAITTING;
-      return true;
-    }
-    robot_msg::SetSlam save_bow_data;
-    save_bow_data.request.cmd = "save";
-    save_bow_data.request.mapdir = req.mapdir;
-    save_bow_data.request.filename = req.filename + ".inv";
-    if ( bow_loop_client_.call(save_bow_data))
-              LOG(INFO) << "save inv data success!";
-    else LOG(INFO) << "save inv faild.";
-    save_status_ = true;
-    slam_status_ = SAVING;
-    while(publish_process_finished_ == false) {
-      usleep(200000);
-    }
-    node_->~Node();
-    node_ = NULL;
-    malloc_trim(0);
-   if ( !save_pgm_map(req.mapdir, req.filename, 0.05) ) {
-      res.success = false;
-      res.message = "Pgm Map saving failed! waitting...";
-      LOG(WARNING) << "Saving failed, pgm map hasn't initialized!";
-      slam_status_ = WAITTING;
+      // slam_status_ = WAITTING;
       return true;
     }
 
-    ros::Duration duration = ros::Time::now()-start_point;
-    LOG(INFO) << "Saving map cost " << duration.toNSec()/1000000000.0 << " seconds.";
-    map_filename_ = req.mapdir+"/"+req.filename;
+    // save_status_ = true;
+    // slam_status_ = SAVING;
+    // while(publish_process_finished_ == false) {
+    //   usleep(200000);
+    // }
+    // node_ = NULL;
+    // malloc_trim(0);
+  //  if ( !SavePbtreamMap(request->mapdir, request->filename) ) {
+  //     response->success = false;
+  //     response->message = "Pgm Map saving failed! waitting...";
+  //     LOG(WARNING) << "Saving failed, pgm map hasn't initialized!";
+  //     // slam_status_ = WAITTING;
+  //     return true;
+  //   }
+
+    // ros::Duration duration = ros::Time::now()-start_point;
+    // LOG(INFO) << "Saving map cost " << duration.toNSec()/1000000000.0 << " seconds.";
+    // map_filename_ = request->mapdir+"/"+request->filename;
     system("sync");
-    res.message = "Map is saved.!";
-    res.success = true;
-    cartographer_ros_msgs::SaveStringMap save_string_map_msg;
-       save_string_map_msg.request.map_name = req.filename;
-    if (save_string_map_client_.call(save_string_map_msg)) 
-      LOG(INFO) << "save string map when saving map.";
-    else
-      LOG(ERROR) << "save string map failed when saving map.";
+    response->message = "Map is saved.!";
+    response->success = true;
 
     return true;
-  } else if (req.cmd == "switch") {
+  } else if (request->cmd == "switch") {
     {
-    absl::MutexLock lock(&mutex_);
-    std::tie(localization_node_options_, localization_traj_options_) =
-    LoadOptions(config_dir_, localization_config_filename_);
-    slam_modes_ = LOCALIZATION;
-    slam_status_ = LOADING; //(yxb) slam is loading data from now
-    relocating_ = true;
-    if (!erase_region_.empty())
-      erase_region_.clear();
-    boost::filesystem::path p(std::string(req.mapdir + "/" + req.filename + ".pbstream"));
-    if (!boost::filesystem::exists(p)){
-      LOG(INFO) << "Map pbstream file path: " << p;
-      res.success = false;
-      LOG(ERROR) << "Map pbstream file not exist";
-      res.message = "Map pbstream file not exist";
-      return true;
-    }
+      absl::MutexLock lock(&mutex_);
+      NodeOptions node_options;
+      TrajectoryOptions trajectory_options;
+      std::tie(node_options, trajectory_options) =
+                LoadOptions(GetConfigurationDirectory(), GetConfigurationBasenameLoc());
 
-    boost::filesystem::path string_map_path(std::string(req.mapdir + "/string_map.txt"));
-    if (!boost::filesystem::exists(string_map_path)) {
-      LOG(INFO) << "string map file not exists when switching map.";
 
-      cartographer_ros_msgs::SaveStringMap save_string_map_msg;
-      save_string_map_msg.request.map_name = req.filename;
-      if (save_string_map_client_.call(save_string_map_msg)) 
-        LOG(INFO) << "save string map when switching map.";
-      else
-        LOG(ERROR) << "save string map failed when switching map.";
-    }
-
-    map_filename_ = req.mapdir + "/" + req.filename;
-    YAML::Node config = YAML::LoadFile(req.mapdir + "/" + req.filename + ".yaml");
-    if ( config["angle"]) {
-      angle_ = config["angle"].as<double>();
-      result_.angle = angle_;
-      LOG(INFO) << "angle: " << angle_;
-    } else {
-      angle_ = 0.0;
-      is_old_map_ = true;
-      LOG(INFO) << "Current map file hasn't angle value.";
-    }
-    if (config["width"]) {
-      is_old_map_ = false;
-      result_.width = config["width"].as<int>();
-      result_.height = config["height"].as<int>();
-      result_.x = config["x"].as<float>();
-      result_.y = config["y"].as<float>();
-    } else {
-      is_old_map_ = true;
-    }
-    start_switch = ros::Time::now();
-    if (node_) {
-      node_->FinishAllTrajectories();
-      node_->RunFinalOptimization();
-      node_->~Node();
-      malloc_trim(0);
-    }
-
-    // after new submap created, clear map date.
-    foo.request.angle = angle_;
-    foo.request.status = "relocating";
-    foo.request.flag = true;
-    foo.request.width = result_.width;
-    foo.request.height = result_.height;
-    foo.request.point.x = result_.x;
-    foo.request.point.y = result_.y;
-    if ( !angle_update_client_.call(foo) ) 
-      LOG(WARNING) << "clear erase region cache failed.";
-    cartographer_ros_msgs::SendStringMapAlone bar;
-    bar.request.file = req.mapdir + "/" + req.filename;
-    if (!pub_string_map_client_.call(bar))
-      LOG(ERROR) << "publish string map failed when switching map.";
-    auto map_builder = absl::make_unique<cartographer::mapping::MapBuilder>(
-        localization_node_options_.map_builder_options, cartographer::mapping::MapBuilderState::LOCALIZATION);
-    node_ = new Node(localization_node_options_, std::move(map_builder), tf_,
-                     false, is_empty_topic);
-    node_->SetUpdateMap(true);
-    node_->Relocate_initialpose(req.initial_pose ,req.accurate_initial_pose );
-    node_->LoadState(std::string(req.mapdir + "/" + req.filename + ".pbstream"),
-                     true);
-    node_->SetDrawMaxTrajectoryID(true);
-    robot_msg::SetSlam load_bow_data;
-    load_bow_data.request.cmd = "switch";
-    load_bow_data.request.mapdir = req.mapdir;
-    load_bow_data.request.filename = req.filename + ".inv";
-    if ( bow_loop_client_.call(load_bow_data))
-      LOG(INFO) << "load inv data success!";
-    else LOG(INFO) << "load inv data faild.";
-
-    cartographer_ros_msgs::StartTrajectory::Request st_req;
-    st_req.configuration_directory = config_dir_;
-    st_req.configuration_basename = localization_config_filename_;
-    st_req.initial_pose = req.initial_pose;
-    st_req.use_initial_pose = true;
-    st_req.relative_to_trajectory_id = 0;
-    cartographer_ros_msgs::StartTrajectory::Response st_res;
-    if (!node_->HandleStartTrajectory(st_req, st_res)) {
-      res.success = false;
-      LOG(ERROR) << "Can not start a new trajectory!";
-      return true;
-    }
-    }//unlock
-    node_->StartRelocate();
-    node_->BuildmapModeInLocal(req.accurate_initial_pose, false);
-    //MapPublish();
-    relocating_ = false;
-    start_relocate_time_ = ros::Time::now();
-    ros::Duration switch_duration = ros::Time::now()-start_switch;
-    LOG(INFO) << "Switch map cost " << switch_duration.toNSec()/1000000000.0
-              <<" seconds, switched map and start relocating.";
-    slam_status_ = RELOCATING; //(yxb) now data loaded, start relocating.
-    res.success = true;
-    map_published_ = false;
-    return true;
-  } else if (req.cmd == "reloc") {
-      if (slam_status_ == BUILDING || slam_status_ == SAVING) {
-        res.success = false;
-        res.message = "You should finish the current map, firstly.";
+      boost::filesystem::path p(std::string(request->mapdir + "/" + request->filename + ".pbstream"));
+      if (!boost::filesystem::exists(p)){
+        LOG(INFO) << "Map pbstream file path: " << p;
+        response->success = false;
+        LOG(ERROR) << "Map pbstream file not exist";
+        response->message = "Map pbstream file not exist";
         return true;
-      } 
-      if (node_ == nullptr) {
-        res.success = false;
-        res.message = "cartographer node not initilized!, waitting...";
-        slam_status_ = WAITTING;
-        return true;
-      } else {
-        node_->Relocate_initialpose(req.initial_pose ,false);
-        node_->StartRelocate();
-        start_relocate_time_ = ros::Time::now();
-        slam_status_ = RELOCATING;
-        res.success = true;
-        res.message = "Started relocate.";
       }
-      else {
-      res.success = false;
-      //slam_status_ = WAITTING;
-      res.message = "SLAM is not in located state.";
-    }
-    
-  } else {
-    LOG(WARNING)<<"Unsupported cmd.";
-    res.success = false;
-    return false;
+
+
+
+      // start_switch = ros::Time::now();
+      if (node_) {
+        FinishAllTrajectories();
+        RunFinalOptimization();
+      }
+
+
+      // auto map_builder = absl::make_unique<cartographer::mapping::MapBuilder>(
+      //     localization_node_options_.map_builder_options, cartographer::mapping::MapBuilderState::LOCALIZATION);
+      // node_ = new Node(localization_node_options_, std::move(map_builder), tf_,
+      //                 false, is_empty_topic);
+      // node_->SetUpdateMap(true);
+      // node_->Relocate_initialpose(request->initial_pose ,request->accurate_initial_pose );
+      LoadState(std::string(request->mapdir + "/" + request->filename + ".pbstream"),
+                      true);
+      // node_->SetDrawMaxTrajectoryID(true);
+
+
+      cartographer_ros_msgs::srv::StartTrajectory::Request::SharedPtr st_req;
+      st_req->configuration_directory = GetConfigurationDirectory();
+      st_req->configuration_basename = GetConfigurationBasenameLoc();
+      st_req->initial_pose = request->initial_pose;
+      st_req->use_initial_pose = true;
+      st_req->relative_to_trajectory_id = 0;
+      cartographer_ros_msgs::srv::StartTrajectory::Response::SharedPtr st_res;
+      if (!handleStartTrajectory(st_req, st_res)) {
+        response->success = false;
+        LOG(ERROR) << "Can not start a new trajectory!";
+        return true;
+      }
+    }//unlock
+    // node_->StartRelocate();
+    // node_->BuildmapModeInLocal(request->accurate_initial_pose, false);
+    //MapPublish();
+    // relocating_ = false;
+    // start_relocate_time_ = ros::Time::now();
+    // ros::Duration switch_duration = ros::Time::now()-start_switch;
+    // LOG(INFO) << "Switch map cost " << switch_duration.toNSec()/1000000000.0
+    //           <<" seconds, switched map and start relocating.";
+    // slam_status_ = RELOCATING; //(yxb) now data loaded, start relocating.
+    response->success = true;
+    // map_published_ = false;
+    return true;
   }
-  LOG(INFO) << "Finished.";
+
+
+  return true;
+  
+}
+
+bool Node::SavePbtreamMap(std::string dir, std::string filename) {
+  std::string pbstream_filename = dir + "/" + filename + ".pbstream";
+  std::string map_filestem = dir + "/" + filename;
+  std::string pbs_md5;
+
+
+  SerializeState(pbstream_filename,
+                 true /* include_unfinished_submaps */);
+
+  // ::cartographer::io::ProtoStreamReader reader(pbstream_filename);
+  // ::cartographer::io::ProtoStreamDeserializer deserializer(&reader);
+  // std::map<::cartographer::mapping::SubmapId, ::cartographer::io::SubmapSlice>
+  //     submap_slices;
+  // ::cartographer::mapping::ValueConversionTables conversion_tables;
+  // ::cartographer::io::DeserializeAndFillSubmapSlices(
+  //     &deserializer, &submap_slices, &conversion_tables);
+  // CHECK(reader.eof());
+
+  // auto result = ::cartographer::io::PaintSubmapSlices(submap_slices, 0.05);
+
+  // ::cartographer::io::StreamFileWriter pgm_writer(map_filestem + ".pgm");
+
+  // ::cartographer::io::Image image(std::move(result.surface));
+  // WritePgm(image, resolution, &pgm_writer);
+  // LOG(INFO) << "pgm saved.";
+  // const Eigen::Vector2d origin(
+  //     -result.origin.x() * resolution,
+  //     (result.origin.y() - image.height()) * resolution);
+
+  // ::cartographer::io::StreamFileWriter yaml_writer(map_filestem + ".yaml");
+  // WriteYaml(pbstream_filename, resolution, origin, pgm_writer.GetFilename(),
+  //           angle_, result_.width, result_.height,
+  //           result_.x, result_.y, &yaml_writer);
+  // LOG(INFO) << "yaml saved."; 
+
   return true;
 }
-*/
 
 bool Node::handleTrajectoryQuery(
     const cartographer_ros_msgs::srv::TrajectoryQuery::Request::SharedPtr request,

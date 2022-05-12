@@ -52,7 +52,8 @@ def generate_launch_description():
         parameters = [{'use_sim_time': LaunchConfiguration('use_sim_time')}],
         arguments = [
             '-configuration_directory', FindPackageShare('cartographer_ros').find('cartographer_ros') + '/configuration_files',
-            '-configuration_basename', 'test2d.lua'],
+            '-configuration_basename', 'test2d.lua',
+            '-configuration_basename_loc', 'test2d.lua'],
 
         output = 'screen'
         )

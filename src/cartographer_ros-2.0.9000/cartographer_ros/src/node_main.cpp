@@ -35,6 +35,9 @@ DEFINE_string(configuration_basename, "",
 DEFINE_string(load_state_filename, "",
               "If non-empty, filename of a .pbstream file to load, containing "
               "a saved SLAM state.");
+DEFINE_string(configuration_basename_loc, "",
+              "Basename, i.e. not containing any directory prefix, of the "
+              "configuration file.");
 DEFINE_bool(load_frozen_state, true,
             "Load the saved state as frozen (non-optimized) trajectories.");
 DEFINE_bool(
@@ -70,23 +73,30 @@ void Run() {
   auto node = std::make_shared<cartographer_ros::Node>(
     node_options, std::move(map_builder), tf_buffer, cartographer_node,
     FLAGS_collect_metrics);
-  if (!FLAGS_load_state_filename.empty()) {
-    node->LoadState(FLAGS_load_state_filename, FLAGS_load_frozen_state);
-  }
 
-  if (FLAGS_start_trajectory_with_default_topics) {
-    node->StartTrajectoryWithDefaultTopics(trajectory_options);
-  }
+  node->SetConfigurationDirectory(FLAGS_configuration_directory);
+  node->SetConfigurationBasename(FLAGS_configuration_basename);
+  node->SetConfigurationBasenameLoc(FLAGS_configuration_basename_loc);
+
+
+
+  // if (!FLAGS_load_state_filename.empty()) {
+  //   node->LoadState(FLAGS_load_state_filename, FLAGS_load_frozen_state);
+  // }
+
+  // if (FLAGS_start_trajectory_with_default_topics) {
+  //   node->StartTrajectoryWithDefaultTopics(trajectory_options);
+  // }
 
   rclcpp::spin(cartographer_node);
 
-  node->FinishAllTrajectories();
-  node->RunFinalOptimization();
+  // node->FinishAllTrajectories();
+  // node->RunFinalOptimization();
 
-  if (!FLAGS_save_state_filename.empty()) {
-    node->SerializeState(FLAGS_save_state_filename,
-                        true /* include_unfinished_submaps */);
-  }
+  // if (!FLAGS_save_state_filename.empty()) {
+  //   node->SerializeState(FLAGS_save_state_filename,
+  //                       true /* include_unfinished_submaps */);
+  // }
 }
 
 }  // namespace
